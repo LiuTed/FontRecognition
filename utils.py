@@ -8,7 +8,7 @@ import io
 
 key2idx = {"font": 0, "fontVariant": 1, "m_label": 2, "strength": 3, "italic": 4, "m_top": 5, "m_left": 6, "h": 7, "w": 8, "img": 9}
 
-def readCSV(csvPath = '../fonts', origin = False, filt = lambda x: int(x["m_label"]) < 256, fontList = None):
+def readCSV(csvPath = 'fonts', origin = False, filt = lambda x: int(x["m_label"]) < 256, fontList = None):
     imgs = []
     other_info = []
     cnt = 0
@@ -20,8 +20,8 @@ def readCSV(csvPath = '../fonts', origin = False, filt = lambda x: int(x["m_labe
         cnt += 1
         if i.split('.')[-1].lower() != 'csv':
             continue
-        path = os.path.join(csvPath, i)
-        with open(path) as f:
+        path = csvPath + '/' + i
+        with open(file=path, mode='r') as f:
             reader = csv.DictReader(f)
             for line in reader:
                 # print(path, line["font"], line["m_label"], chr(int(line["m_label"])))
@@ -44,12 +44,16 @@ def readCSV(csvPath = '../fonts', origin = False, filt = lambda x: int(x["m_labe
                 if origin:
                     im = Image.fromarray(img)
                     im_resize = im.resize([ow, oh])
+                    st = int(st / 2)
+                    sl = int(sl / 2)
                     img = np.zeros([oh + st * 2, ow + sl * 2], dtype = np.uint8)
                     img[st: st + oh, sl: sl + ow] = np.array(im_resize)
+                    img = np.array(Image.fromarray(img).resize([3 * w, 3 * h]))
                     
                 # plt.figure()
                 # plt.imshow(img, cmap='Greys', vmin = 0, vmax = 255)
                 # plt.show()
+                # plt.close()
                 other_info.append([line["font"], line["fontVariant"], int(line["m_label"]), float(line["strength"]), int(line["italic"]), st, sl, h, w])
                 imgs.append(img)
     return np.array(imgs), other_info
@@ -57,7 +61,7 @@ def readCSV(csvPath = '../fonts', origin = False, filt = lambda x: int(x["m_labe
 def main():
     # sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
     # readCSV(origin = True)
-    imgs, infos = readCSV(fontList = ['ARIAL.csv'], filt = lambda x: int(x["m_label"]) < 128)
+    imgs, infos = readCSV(fontList = ['CALIBRI.csv'], filt = lambda x: int(x["m_label"]) < 128, origin=True)
     d = {}
     for l in infos:
         k = l[1]
