@@ -46,8 +46,8 @@ Font data can be downloaded at: http://archive.ics.uci.edu/ml/datasets/Character
     - SIFT: Liu
     - Fisher Vector: Liu
 - **Model implementation & training**
-    - Bayesian Inference:
-    - Multiclass SVM:
+    - Bayesian Inference: Li
+    - Multiclass SVM: Li
     - Decision Tree (Random Forest):
     - Clustering:
     - ResNet-18 & LeNet:
