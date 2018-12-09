@@ -43,11 +43,11 @@ Font data can be downloaded at: http://archive.ics.uci.edu/ml/datasets/Character
 - Preprocessing: Read from csv file and image reconstruction
     - Done
 - Feature Extraction: Extract feature from image and (optional) encoding
-    - SIFT: Liu
+    - SIFT: patent encumbered, replaced by Daisy Descriptor, Done
     - Fisher Vector: Liu
 - **Model implementation & training**
-    - Bayesian Inference:
-    - Multiclass SVM:
+    - Bayesian Inference: Li
+    - Multiclass SVM: Li
     - Decision Tree (Random Forest):
     - Clustering:
-    - ResNet-18 & LeNet:
+    - ResNet-18 & LeNet: Liu
