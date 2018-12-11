@@ -48,6 +48,6 @@ Font data can be downloaded at: http://archive.ics.uci.edu/ml/datasets/Character
 - **Model implementation & training**
     - Bayesian Inference: Li
     - Multiclass SVM: Li
-    - Decision Tree (Random Forest):
-    - Clustering:
+    - Decision Tree (Random Forest):Chen
+    - Clustering:  Chen
     - ResNet-18 & LeNet: Liu
