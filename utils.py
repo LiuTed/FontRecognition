@@ -3,6 +3,7 @@ import csv
 import matplotlib.pyplot as plt
 from PIL import Image
 from skimage.feature import daisy as skdaisy
+from skimage.feature import hog as skhog
 import os
 import sys
 import io
@@ -60,7 +61,9 @@ def readCSV(csvDir, origin = False, filt = lambda x: int(x["m_label"]) < 256, fo
         print("%d/%d" % (cnt, len(fontList)))
         cnt += 1
         basename, extname = os.path.splitext(i)
-        if extname.lower() != '.csv':
+        if extname == '':
+            i += '.csv'
+        elif extname.lower() != '.csv':
             continue
         path = os.path.join(csvDir, i) # use os api to keep portability
         img_tmp = []
@@ -183,6 +186,21 @@ def deserialize(storeDir, fontList = None):
         
 def daisy(img):
     return skdaisy(img, radius = 8, histograms = 4, orientations = 4)
+
+def hog(img):
+    return skhog(img, orientations = 4, pixels_per_cell=(15,15))
+
+def euclidean_metric(diff):
+    return np.sqrt(np.sum(np.square(diff), axis = -1))
+
+def nearest_neighbour(x, samples, metric = euclidean_metric):
+    # x.shape = (d)
+    # samples.shape = (n, d)
+    x = np.expand_dims(x, 0)
+    dist = metric(x - samples)
+    lst = [i for i in range(samples.shape[0])]
+    lst.sort(key = lambda i: dist[i])
+    return lst, dist
 
 def test():
     # sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
