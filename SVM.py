@@ -1,98 +1,38 @@
 import numpy as np
-import csv
 import matplotlib.pyplot as plt
-from PIL import Image
 import os
+import random
 from sklearn import svm
-from sklearn.cross_validation import train_test_split
-import pickle
-from skimage.feature import daisy as skdaisy
+from sklearn.model_selection import train_test_split
+from skimage.feature import daisy
 from sklearn.decomposition import IncrementalPCA
+import utils
 
-key2idx = {"font": 0, "fontVariant": 1, "m_label": 2, "strength": 3, "italic": 4, "m_top": 5, "m_left": 6, "h": 7,
-           "w": 8, "img": 9}
+# textScore(): This function is used to give the accuracy of a SVM classifier corresponding to parameter 'clf'.
+# 'X' is the test data containing x, and 'font' provides the correct font sort, y.
+# 'test_num' represents the length of sentence to test.
+# 'rep' is the times of repetition of randomly selecting samples from 'X'.
+def textScore(clf, X, font, text_num=1, rep=None):
+    n = len(X)
+    if rep is None:
+        rep = n
+    correct = 0
+    for i in range(rep):
+        s = random.sample(range(n), text_num)
+        X0 = X[s]
+        y1 = clf.predict(X=X0)
+        y_ = sorted([(np.sum(np.array(y1) == f), f) for f in set(y1)])[-1][1]
+        if y_ == font:
+            correct += 1
+    return correct/rep
 
-
-def readCSVAndSerialize(fontList, csvDir='fonts', storeDir='rawData', filt=None, origin=True):
-    if fontList is None:
-        return
-    if not os.path.exists(storeDir):
-        os.mkdir(storeDir)
-
-    for i in fontList:
-        basename, extname = os.path.splitext(i)
-        if extname.lower() != '.csv':
-            continue
-        imgs = []
-        other_info = []
-        path = csvDir + '/' + i
-
-        with open(file=path, mode='r') as f:
-            reader = csv.DictReader(f)
-            for line in reader:
-                if filt:  # where we can use multiple filtering
-                    for fil in filt:
-                        if not fil(line):
-                            continue
-
-                h = int(line["h"])
-                w = int(line["w"])
-                oh = int(line["originalH"])
-                ow = int(line["originalW"])
-                st = int(line["m_top"])
-                sl = int(line["m_left"])
-
-                img = np.empty([h, w], dtype=np.uint8)
-                for i in range(h):
-                    for j in range(w):
-                        img[i, j] = int(line["r%dc%d" % (i, j)])
-
-                if origin:
-                    im = Image.fromarray(img)
-                    if ow > 64 or oh > 64:
-                        maxi = max(ow, oh)
-                        neww = int(ow * 64 / maxi)
-                        newh = int(oh * 64 / maxi)
-                    else:
-                        neww = ow
-                        newh = oh
-                    im_resize = np.array(im.resize([neww, newh]))
-                    img = np.zeros([64, 64], dtype=np.uint8)
-                    st_tmp = (64 - newh) // 2
-                    sl_tmp = (64 - neww) // 2
-                    img[st_tmp:st_tmp + newh, sl_tmp:sl_tmp + neww] = im_resize
-
-                # show_img(img)
-                other_info.append([line["font"], line["fontVariant"], int(line["m_label"]), float(line["strength"]),
-                                   int(line["italic"]), st, sl, h, w])
-                imgs.append(img)
-        imgs = np.array(imgs)
-        np.save(os.path.join(storeDir, basename + '.npy'), imgs)
-        with open(os.path.join(storeDir, basename + '.pk'), "wb") as f:
-            pickle.dump(other_info, f)
-
-
-def deserialize(fontList, storeDir='rawData'):
-    if fontList is None:
-        return
-
-    imgs = []
-    other_info = []
-    for i in fontList:
-        npfile = os.path.join(storeDir, i + '.npy')
-        pkfile = os.path.join(storeDir, i + '.pk')
-        if not (os.path.exists(npfile) and os.path.exists(pkfile)):
-            print('Warning: file %s or %s not exist' % (npfile, pkfile))
-            continue
-        imgs.append(np.load(npfile))
-        with open(pkfile, "rb") as f:
-            other_info.append(pickle.load(f))
-    return imgs, other_info
-
-def daisy(img):
-    return skdaisy(img, radius=8, histograms=4, orientations=4)
-
-def svmClassifier(X, y, fonts, cv_times=10, test_size=0.25, kernel='rbf', C=1.0, show=True):
+# svmClassifier(): This function presents the SVM method we apply here where 'X' and 'y' is the training data.
+# 'fonts' is the list of font sorts included in 'y'. 'cv_times' is the times of fold of cross-validation.
+# 'test_size' is the ratio by which we split the data for cross-validation.
+# 'kernel'/'C' are parameters of SVM. 'show' represents if the function provides a progress report.
+# 'test_num' is the length of sentence we intend to consider to generate the accuracy.
+# 'average' represents whether the function return the average accuracy of each sort.
+def svmClassifier(X, y, fonts, cv_times=10, test_size=0.25, kernel='rbf', C=1.0, show=False, text_num=1, average=False):
     accuracy = np.zeros((10, len(fonts), 2))  # to record the outcome
     for times in range(cv_times):
         if show:
@@ -106,7 +46,7 @@ def svmClassifier(X, y, fonts, cv_times=10, test_size=0.25, kernel='rbf', C=1.0,
                 if y_train[i] == fonts[j]:
                     s.append(i)
             if s:
-                accuracy[times][j][0] = clf.score(X=np.array(X_train)[s], y=np.array(y_train)[s])
+                accuracy[times][j][0] = textScore(clf, X_train[s], fonts[j], text_num=text_num)
                 if show:
                     print('Train accuracy for "' + fonts[j] + '" is: ', accuracy[times][j][0])
             s = []
@@ -114,28 +54,23 @@ def svmClassifier(X, y, fonts, cv_times=10, test_size=0.25, kernel='rbf', C=1.0,
                 if y_test[i] == fonts[j]:
                     s.append(i)
             if s:
-                accuracy[times][j][1] = clf.score(X=np.array(X_test)[s], y=np.array(y_test)[s])
+                accuracy[times][j][1] = textScore(clf, X_test[s], fonts[j], text_num=text_num)
                 if show:
                     print('Test accuracy for "' + fonts[j] + '" is: ', accuracy[times][j][1])
-    return accuracy
+    if not average:
+        return accuracy
+    else:
+        s = None
+        for a in accuracy:
+            if s is not None:
+                s += a
+            else:
+                s = np.array(a)
+        return s/cv_times
 
-def main():
-    # sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
-    # readCSV(origin = True)
-
-    fonts = ['CALIFORNIAN', 'HARRINGTON', 'BRUSH', 'MODERN', 'PAPYRUS', 'EDWARDIAN', 'FREESTYLE']
-    # fonts = ['BRUSH', 'PAPYRUS']
-
-    #'''-----SELECT FROM RAWDATA-----
-    paths = [f + '.csv' for f in fonts]
-    filt = (lambda x: int(x['m_label']) < 128,
-            lambda x: x['fontVariant'] != 'scanned',
-            lambda x: x['orientation'] == 0)
-    readCSVAndSerialize(fontList=paths, filt=filt)
-    #'''
-
-    imgs, other_info = deserialize(fontList=fonts)
-
+def daisyAndSerialize(imgs, fonts, storeDir='proData', filename='daisy', radius=8, histograms=4, orientations=4):
+    if not os.path.exists(storeDir):
+        os.mkdir(storeDir)
     M = len(imgs)
     y = []
     X = []
@@ -143,16 +78,103 @@ def main():
         N = len(imgs[i])
         for j in range(N):
             y.append(fonts[i])
-            d = daisy(imgs[i][j])
+            d = daisy(imgs[i][j], radius=radius, histograms=histograms, orientations=orientations)
             X.append(list(d.reshape(np.size(d))))
             print(str(i) + '/' + str(j))
+    np.save(os.path.join(storeDir, filename + '_y.npy'), y)
+    np.save(os.path.join(storeDir, filename + '_X.npy'), X)
 
-    n_components = 100
-    clf = IncrementalPCA(n_components=n_components, whiten=True)
-    X = clf.fit_transform(X=X)
+def daisyDeserialize(storeDir='proData', filename='daisy'):
+    return np.load(os.path.join(storeDir, filename + '_y.npy')),\
+           np.load(os.path.join(storeDir, filename + '_X.npy'))
 
-    acc = svmClassifier(X, y, fonts, show=False)
-    print(acc)
+def main():
+    # fonts = ['CALIFORNIAN', 'HARRINGTON', 'BRUSH', 'MODERN', 'PAPYRUS', 'EDWARDIAN', 'FREESTYLE', 'AGENCY', 'BASKERVILLE', 'BAUHAUS', 'VLADIMIR', 'VIVALDI', 'VINER', 'TXT']
+    fonts = ['CALIFORNIAN', 'HARRINGTON', 'BRUSH', 'MODERN', 'PAPYRUS', 'EDWARDIAN', 'FREESTYLE']
+
+    # y = np.load('proData/daisy7_y.npy')
+    # X = np.load('proData/daisy7_100pca_X.npy')
+
+    '''-----SELECT FROM RAWDATA-----
+    paths = [f + '.csv' for f in fonts]
+    filt = None
+    utils.readCSVAndSerialize(csvDir='fonts', storeDir='rawData', csvList=paths, filt=filt)
+    '''
+
+    '''-----PROCESS BY DAISY-----
+    imgs, other_info = utils.deserialize(storeDir='rawData', fontList=fonts)
+    daisyAndSerialize(imgs, fonts, filename='daisy7')
+    y, X = daisyDeserialize(filename='daisy7')
+    pca = IncrementalPCA(n_components=100, whiten=True)
+    X_pca = pca.fit_transform(X=X)
+    np.save('proData/daisy7_100pca_X.npy', X_pca)
+    '''
+
+    '''-----C VARIATION-----
+    n_components = 50
+    acc = []
+    Cs = [1 * i for i in range(1, 8)]
+    for C in Cs:
+        print('C =', C)
+        ai = svmClassifier(X=X[..., :n_components], y=y, fonts=fonts, C=C, show=False, average=True)
+        acc.append(list(ai.transpose()[1]))
+        print(acc[-1])
+    acc = np.array(acc).transpose()
+    ax = plt.subplot(111)
+    for i in range(len(fonts)):
+        ax.plot(Cs, acc[i], label=fonts[i])
+    plt.title('Accuracy with respect to C\nrbf kernel SVM, n_components=50')
+    plt.xlabel('C')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.savefig('svm_CVariation.png')
+    plt.close()
+    '''
+
+    '''-----N COMPONENTS VARIATION-----
+    C = 20
+    acc = []
+    ns = [10 * i for i in range(1, 8)]
+    for n in ns:
+        print('n =', n)
+        ai = svmClassifier(X=X[..., :n], y=y, fonts=fonts, C=C, show=False, average=True)
+        acc.append(list(ai.transpose()[1]))
+        print(acc[-1])
+    acc = np.array(acc).transpose()
+    ax = plt.subplot(111)
+    for i in range(len(fonts)):
+        ax.plot(ns, acc[i], label=fonts[i])
+    plt.title('Accuracy with respect to n_components\nrbf kernel SVM, C=20')
+    plt.xlabel('n_components')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.savefig('svm_nVariation.png')
+    plt.close()
+    '''
+
+    '''-----TEXT ACCURACY-----
+    nums = [1, 5, 10, 20, 30, 50, 100]
+    C = 1.0
+    n_pca = 10
+    acc = []
+    for num in nums:
+        print('num =', num)
+        ai = svmClassifier(X=X[..., :n_pca], y=y, fonts=fonts, C=C, text_num=num, show=False, average=True)
+        acc.append(list(ai.transpose()[1]))
+        print(acc[-1])
+    acc = np.array(acc).transpose()
+    ax = plt.subplot(111)
+    xaxis = list(range(len(nums)))
+    for i in range(len(fonts)):
+        ax.plot(xaxis, acc[i], label=fonts[i])
+    plt.xticks(xaxis, nums)
+    plt.title('Accuracy with respect to text_num\nrbf kernel SVM, C=1.0, n_components=10')
+    plt.xlabel('text_num')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.savefig('svm_textVariation.png')
+    plt.close()
+    '''
 
 if __name__ == '__main__':
     main()
