@@ -1,0 +1,5 @@
+This is a note of correspondence between figures and .py files.
+fig 12(a):dt_md_on_accuracy.py
+fig 12(b):dt_mid_on_accuracy.py
+fig 13:rf_N_on_accuracy.py
+fig 14:performance_of_dt&rf.py
