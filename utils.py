@@ -144,10 +144,16 @@ def readCSVAndSerialize(csvDir, storeDir, csvList = None, filt = lambda x: int(x
 
                 if origin:
                     im = Image.fromarray(img)
-                    if ow > 64 or oh > 64:
+                    if ow <= 0 or oh <= 0:
+                        continue
+                    elif ow > 64 or oh > 64:
                         maxi = max(ow, oh)
                         neww = int(ow * 64 / maxi)
                         newh = int(oh * 64 / maxi)
+                        if neww == 0:
+                            neww = 1
+                        if newh == 0:
+                            newh = 1
                     else:
                         neww = ow
                         newh = oh
@@ -216,5 +222,11 @@ def test():
     imgs, infos = deserialize('../data')
     print(len(imgs), len(infos))
 
+def prepare():
+    readCSVAndSerialize('../fonts', '../data', 
+        list(map(lambda x: x+'.csv', ['CALIFORNIAN', 'HARRINGTON', 'BRUSH', 'MODERN', 'PAPYRUS', 'EDWARDIAN', 'FREESTYLE']))
+    )
+
 if __name__ == '__main__':
-    test()
+    # test()
+    prepare()
